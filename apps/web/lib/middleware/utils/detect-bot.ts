@@ -23,7 +23,10 @@ export const detectBot = (req: Request) => {
   // Check ua
   const ua = userAgent(req);
 
-  if (ua) {
+  // userAgent() always returns an object, even when the user-agent header is
+  // missing, so check the actual user agent string here. Otherwise the referer
+  // and IP checks below would never run.
+  if (ua.ua) {
     const isKnownFalsePositive = UA_FALSE_POSITIVES.some((pattern) =>
       pattern.test(ua.ua),
     );
@@ -31,10 +34,16 @@ export const detectBot = (req: Request) => {
       (s, pattern) => s.replace(pattern, ""),
       ua.ua,
     );
-    return (
+
+    // Only a positive match is conclusive: a user agent that doesn't look like
+    // a bot can still come from a bot referer or IP, so we fall through to the
+    // checks below instead of returning early.
+    if (
       (!isKnownFalsePositive && ua.isBot) ||
       UA_BOTS.some((bot) => new RegExp(bot, "i").test(sanitizedUa))
-    );
+    ) {
+      return true;
+    }
   }
 
   // Check referer
